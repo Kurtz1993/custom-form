@@ -1,16 +1,17 @@
-import { yupResolver } from '@hookform/resolvers/yup';
-import { CheckCircle, Error } from '@mui/icons-material';
-import { AppBar, Button, Card, CardContent, CircularProgress, InputAdornment, TextField, Toolbar } from '@mui/material';
-import { useEffect, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
-import * as yup from 'yup';
-
-const codeIcons = {
-  ok: <CheckCircle color="success" />,
-  error: <Error color="error" />,
-  inProgress: <CircularProgress className="!w-6 !h-6" />,
-  idle: null,
-} as const;
+import { yupResolver } from "@hookform/resolvers/yup";
+import {
+  AppBar,
+  Button,
+  Card,
+  CardContent,
+  InputAdornment,
+  TextField,
+  Toolbar
+} from "@mui/material";
+import { useCallback } from "react";
+import { Controller, useForm } from "react-hook-form";
+import * as yup from "yup";
+import { statusIcons, useDebounce } from "./hooks/useDebounce";
 
 const formSchema = yup.object({
   email: yup.string().email().required(),
@@ -26,28 +27,28 @@ function App() {
     control,
   } = useForm({
     defaultValues: {
-      email: '',
-      password: '',
-      code: '',
+      email: "",
+      password: "",
+      code: "",
     },
     resolver: yupResolver(formSchema),
-    mode: 'onTouched'
+    mode: "onTouched",
   });
-  const code = watch('code');
-  const [codeValidationStatus, setCodeValidationStatus] = useState<keyof typeof codeIcons>('idle');
+  const code = watch("code");
+  const codeValidationStatus = useDebounce({ value: code });
+  const password = watch("password");
 
-  useEffect(() => {
-    setCodeValidationStatus(code ? 'inProgress' : 'idle');
-    let timeoutId: number;
+  const pswValidationFn = useCallback((psw: string) => {
+    if (psw === "password") return "ok";
 
-    if (code) {
-      timeoutId = window.setTimeout(() => {
-        setCodeValidationStatus(code === 'code' ? 'ok' : 'error');
-      }, 1000);
-    }
+    return "error";
+  }, []);
 
-    return () => clearTimeout(timeoutId);
-  }, [code]);
+  const passwordValidationStatus = useDebounce({
+    value: password,
+    debounceTime: 2000,
+    action: pswValidationFn,
+  });
 
   return (
     <main>
@@ -88,7 +89,14 @@ function App() {
                   label="Password"
                   type="password"
                   helperText={errors.password?.message}
-                  error={!!errors.password}
+                  error={passwordValidationStatus === "error"}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        {statusIcons[passwordValidationStatus]}
+                      </InputAdornment>
+                    ),
+                  }}
                   required
                   fullWidth
                 />
@@ -107,7 +115,11 @@ function App() {
                   helperText={errors.code?.message}
                   error={!!errors.code}
                   InputProps={{
-                    endAdornment: <InputAdornment position="end">{codeIcons[codeValidationStatus]}</InputAdornment>,
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        {statusIcons[codeValidationStatus]}
+                      </InputAdornment>
+                    ),
                   }}
                   required
                   fullWidth
